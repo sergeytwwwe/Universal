@@ -14,8 +14,8 @@ local Visual = Window:Page({Name = "Visual", Weapons = true}) do
         local ESPObjects = {}
 
         local function AddESP(Zombie)
-            if not Zombie:FindFirstChild("HumanoidRootPart") or not Zombie:FindFirstChild("Head") then
-                warn("Зомби " .. Zombie.Name .. " не имеет HumanoidRootPart или Head!")
+            if not Zombie:FindFirstChild("HumanoidRootPart") then
+                warn("Зомби " .. Zombie.Name .. " в Workspace.Zombies не имеет HumanoidRootPart!")
                 return
             end
 
@@ -45,7 +45,7 @@ local Visual = Window:Page({Name = "Visual", Weapons = true}) do
             HPText.Center = true
 
             local function UpdateESP()
-                if ESPEnabled and Zombie and Zombie.Parent and Zombie:FindFirstChild("HumanoidRootPart") and Zombie:FindFirstChild("Head") then
+                if ESPEnabled and Zombie and Zombie.Parent == workspace.Zombies and Zombie:FindFirstChild("HumanoidRootPart") then
                     local HRP = Zombie.HumanoidRootPart
                     local Vector, OnScreen = workspace.CurrentCamera:WorldToViewportPoint(HRP.Position)
                     local Player = game.Players.LocalPlayer
@@ -54,33 +54,26 @@ local Visual = Window:Page({Name = "Visual", Weapons = true}) do
 
                     if Character and Character:FindFirstChild("HumanoidRootPart") then
                         local Distance = (Character.HumanoidRootPart.Position - HRP.Position).Magnitude
-                        -- Показываем ESP, если зомби в радиусе действия (как у аимбота)
-                        if Distance <= (flags.AimRadius or 500) then
-                            Box.Size = Vector2.new(2000 / Vector.Z, 3000 / Vector.Z)
-                            Box.Position = Vector2.new(Vector.X - Box.Size.X / 2, Vector.Y - Box.Size.Y / 2)
-                            Box.Visible = true
+                        -- Показываем ESP для всех зомби в Workspace.Zombies
+                        Box.Size = Vector2.new(2000 / Vector.Z, 3000 / Vector.Z)
+                        Box.Position = Vector2.new(Vector.X - Box.Size.X / 2, Vector.Y - Box.Size.Y / 2)
+                        Box.Visible = true
 
-                            NameText.Position = Vector2.new(Vector.X, Vector.Y - Box.Size.Y / 2 - 30)
-                            NameText.Text = Zombie.Name
-                            NameText.Visible = true
+                        NameText.Position = Vector2.new(Vector.X, Vector.Y - Box.Size.Y / 2 - 30)
+                        NameText.Text = Zombie.Name
+                        NameText.Visible = true
 
-                            DistanceText.Position = Vector2.new(Vector.X, Vector.Y - Box.Size.Y / 2 - 15)
-                            DistanceText.Text = "Dist: " .. math.floor(Distance) .. " studs"
-                            DistanceText.Visible = true
+                        DistanceText.Position = Vector2.new(Vector.X, Vector.Y - Box.Size.Y / 2 - 15)
+                        DistanceText.Text = "Dist: " .. math.floor(Distance) .. " studs"
+                        DistanceText.Visible = true
 
-                            if Humanoid then
-                                HPText.Position = Vector2.new(Vector.X, Vector.Y - Box.Size.Y / 2)
-                                HPText.Text = "HP: " .. math.floor(Humanoid.Health) .. "/" .. Humanoid.MaxHealth
-                                HPText.Visible = true
-                            else
-                                HPText.Visible = false
-                                print("Зомби " .. Zombie.Name .. " не имеет Humanoid, HP не отображается")
-                            end
+                        if Humanoid then
+                            HPText.Position = Vector2.new(Vector.X, Vector.Y - Box.Size.Y / 2)
+                            HPText.Text = "HP: " .. math.floor(Humanoid.Health) .. "/" .. Humanoid.MaxHealth
+                            HPText.Visible = true
                         else
-                            Box.Visible = false
-                            NameText.Visible = false
-                            DistanceText.Visible = false
                             HPText.Visible = false
+                            print("Зомби " .. Zombie.Name .. " не имеет Humanoid, HP не отображается")
                         end
                     else
                         Box.Visible = false
@@ -94,7 +87,7 @@ local Visual = Window:Page({Name = "Visual", Weapons = true}) do
                     DistanceText.Visible = false
                     HPText.Visible = false
                     if ESPEnabled and Zombie and Zombie.Parent then
-                        print("ESP не отображается для зомби " .. Zombie.Name .. ": нет HumanoidRootPart или Head")
+                        print("ESP не отображается для зомби " .. Zombie.Name .. ": не в Workspace.Zombies или нет HumanoidRootPart")
                     end
                 end
             end
@@ -105,10 +98,10 @@ local Visual = Window:Page({Name = "Visual", Weapons = true}) do
         end
 
         local function CheckZombies()
-            -- Сканируем всех зомби в workspace, а не только в workspace.Zombies
-            for _, obj in pairs(workspace:GetDescendants()) do
-                if obj:IsA("Model") and obj:FindFirstChild("HumanoidRootPart") and obj:FindFirstChild("Head") and not ESPObjects[obj] then
-                    AddESP(obj)
+            -- Проверяем только зомби в Workspace.Zombies
+            for _, Zombie in pairs(workspace.Zombies:GetChildren()) do
+                if not ESPObjects[Zombie] then
+                    AddESP(Zombie)
                 end
             end
         end
@@ -120,7 +113,7 @@ local Visual = Window:Page({Name = "Visual", Weapons = true}) do
                 ESPEnabled = Value
                 if ESPEnabled then
                     CheckZombies()
-                    print("ESP включён, найдено зомби: " .. tostring(#workspace.Zombies:GetChildren()))
+                    print("ESP включён, найдено зомби в Workspace.Zombies: " .. tostring(#workspace.Zombies:GetChildren()))
                 else
                     for _, Data in pairs(ESPObjects) do
                         Data.Box.Visible = false
@@ -143,21 +136,21 @@ local Visual = Window:Page({Name = "Visual", Weapons = true}) do
             end
         })
 
-        -- Обновляем список зомби при добавлении новых объектов
-        workspace.DescendantAdded:Connect(function(obj)
-            if ESPEnabled and obj:IsA("Model") and obj:FindFirstChild("HumanoidRootPart") and obj:FindFirstChild("Head") and not ESPObjects[obj] then
-                AddESP(obj)
+        -- Обновляем список зомби только в Workspace.Zombies
+        workspace.Zombies.ChildAdded:Connect(function(Zombie)
+            if ESPEnabled and not ESPObjects[Zombie] then
+                AddESP(Zombie)
             end
         end)
 
-        workspace.DescendantRemoving:Connect(function(obj)
-            if ESPObjects[obj] then
-                ESPObjects[obj].Box:Remove()
-                ESPObjects[obj].NameText:Remove()
-                ESPObjects[obj].DistanceText:Remove()
-                ESPObjects[obj].HPText:Remove()
-                ESPObjects[obj] = nil
-                print("Удалён ESP для зомби: " .. obj.Name)
+        workspace.Zombies.ChildRemoved:Connect(function(Zombie)
+            if ESPObjects[Zombie] then
+                ESPObjects[Zombie].Box:Remove()
+                ESPObjects[Zombie].NameText:Remove()
+                ESPObjects[Zombie].DistanceText:Remove()
+                ESPObjects[Zombie].HPText:Remove()
+                ESPObjects[Zombie] = nil
+                print("Удалён ESP для зомби: " .. Zombie.Name)
             end
         end)
     end
@@ -181,26 +174,26 @@ local Combat = Window:Page({Name = "Combat settings", Weapons = true}) do
             local MinValue = math.huge
             local Method = flags.AimMethod or "Distance"
 
-            for _, Zombie in pairs(workspace:GetDescendants()) do
-                if Zombie:IsA("Model") then
-                    local Head = Zombie:FindFirstChild("Head")
-                    local HRP = Zombie:FindFirstChild("HumanoidRootPart")
-                    local Humanoid = Zombie:FindFirstChild("Humanoid")
-                    if Head and HRP then
-                        local Distance = (Character.HumanoidRootPart.Position - HRP.Position).Magnitude
-                        if Distance <= (flags.AimRadius or 500) then
-                            local Value
-                            if Method == "Distance" then
-                                Value = Distance
-                            elseif Method == "HP" and Humanoid then
-                                Value = Humanoid.Health
-                            elseif Method == "Random" then
-                                Value = math.random()
-                            end
-                            if Value and Value < MinValue then
-                                MinValue = Value
-                                ClosestZombie = Zombie
-                            end
+            -- Проверяем только зомби в Workspace.Zombies
+            for _, Zombie in pairs(workspace.Zombies:GetChildren()) do
+                local Head = Zombie:FindFirstChild("Head")
+                local HRP = Zombie:FindFirstChild("HumanoidRootPart")
+                if Head and HRP then
+                    local Distance = (Character.HumanoidRootPart.Position - HRP.Position).Magnitude
+                    if Distance <= (flags.AimRadius or 500) then
+                        local Value
+                        if Method == "Distance" then
+                            Value = Distance
+                        elseif Method == "HP" then
+                            local Humanoid = Zombie:FindFirstChild("Humanoid")
+                            Value = Humanoid and Humanoid.Health or math.huge
+                        elseif Method == "Random" then
+                            Value = math.random()
+                        end
+                        if Value and Value < MinValue then
+                            MinValue = Value
+                            ClosestZombie = Zombie
+                            print("Аимбот выбрал зомби: " .. Zombie.Name .. " (Distance: " .. math.floor(Distance) .. ")")
                         end
                     end
                 end
@@ -218,6 +211,7 @@ local Combat = Window:Page({Name = "Combat settings", Weapons = true}) do
                 local CurrentCFrame = Camera.CFrame
                 local TargetCFrame = CFrame.new(CurrentCFrame.Position, HeadPos)
                 Camera.CFrame = CurrentCFrame:Lerp(TargetCFrame, 1 / Smoothness)
+                print("Аимбот наводится на голову зомби: " .. Zombie.Name)
             end
         end
 
